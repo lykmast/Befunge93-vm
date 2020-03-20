@@ -93,6 +93,37 @@ void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir, int trace){
 	int sp=-1;
 	char tmp;
 	char buf[20];
+
+	static void *label_tab[]={
+		&&SPACE_OP,
+		&&PLUS_OP,
+		&&MINUS_OP,
+		&&MUL_OP,
+		&&DIN_OP,
+		&&MOD_OP,
+		&&NOT_OP,
+		&&BGT_OP,
+		&&EAST_OP,
+		&&WEST_OP,
+		&&NORTH_OP,
+		&&SOUTH_OP,
+		&&ANY_OP,
+		&&HIF_OP,
+		&&VIF_OP,
+		&&STR_OP,
+		&&DUB_OP,
+		&&SWP_OP,
+		&&POP_OP,
+		&&PRI_OP,
+		&&PRC_OP,
+		&&SKP_OP,
+		&&GET_OP,
+		&&PUT_OP,
+		&&RDI_OP,
+		&&RDC_OP,
+		&&HLT_OP
+	};
+#define NEXT_INSTRUCTION goto *(void *)label_tab[vm->grid[pcI][pcJ]]
 NORMAL:
 	/*NORMAL MODE*/
 	while(1){
@@ -105,132 +136,159 @@ NORMAL:
 
 		switch (opcode) {
 			case ' ':
-				break;
+SPACE_OP:
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 			case '+':
+PLUS_OP:
 				vm->stack[sp-1] = vm->stack[sp-1] + vm->stack[sp];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '-':
+MINUS_OP:
 				vm->stack[sp-1] = vm->stack[sp-1] - vm->stack[sp];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '*':
+MUL_OP:
 				vm->stack[sp-1] = vm->stack[sp-1] * vm->stack[sp];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '/':
+DIN_OP:
 				vm->stack[sp-1] = vm->stack[sp-1] / vm->stack[sp];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '%':
+MOD_OP:
 				vm->stack[sp-1] = vm->stack[sp-1] % vm->stack[sp];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '!':
+NOT_OP:
 				vm->stack[sp] = !(vm->stack[sp]);
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '`':
+BGT_OP:
 				vm->stack[sp-1] = vm->stack[sp-1] > vm->stack[sp];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '>':
+EAST_OP:
 				dir = EAST;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '<':
+WEST_OP:
 				dir = WEST;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '^':
+NORTH_OP:
 				dir = NORTH;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case 'v':
+SOUTH_OP:
 				dir = SOUTH;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '?':
+ANY_OP:
 				dir = (dir_t)(rand()%4);
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '_':
+HIF_OP:
 				if(vm->stack[sp])
 					dir = WEST;
 				else
 					dir = EAST;
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '|':
+VIF_OP:
 				if(vm->stack[sp])
 					dir = NORTH;
 				else
 					dir = SOUTH;
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '"':
+STR_OP:
 				goto STRING;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case ':':
+DUB_OP:
 				vm->stack[sp+1] = vm->stack[sp];
 				sp++;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '\\':
+SWP_OP:
 				tmp = vm->stack[sp];
 				vm->stack[sp] = vm->stack[sp-1];
 				vm->stack[sp-1] = tmp;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '$':
+POP_OP:
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '.':
+PRI_OP:
 				printf("%d",vm->stack[sp]);
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case ',':
+PRC_OP:
 				putchar(vm->stack[sp]);
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '#':
+SKP_OP:
 				pc_incr(&pcI, &pcJ, dir);
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case 'g':
+GET_OP:
 				vm->stack[sp-1] =
 					vm->grid[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])];
 				sp--;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case 'p':
+PUT_OP:
 				vm->grid[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])] =
 					vm->stack[sp-2];
 				sp-=3;
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '&':
+RDI_OP:
 				fgets(buf, 20, stdin);
 				vm->stack[++sp] = atoi(buf);
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '~':
+RDC_OP:
 				vm->stack[++sp]=getchar();
-				break;
+				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
 
 			case '@':
+HLT_OP:
 				if(trace){
 					vm_print_grid(vm);
 				}
@@ -269,6 +327,7 @@ ENDSTRING:
 }
 
 int main(int argc, char const *argv[]) {
+
 	/*--------------PREPROCESSING--------------*/
 	if (argc!=2){
 		perror("Wrong number of arguments\n");
