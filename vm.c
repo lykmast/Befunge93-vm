@@ -40,7 +40,7 @@ void preprocess(char const* filename,char grid[ROWS][COLS]){
 		}
 		else{
 			if(jj==COLS){
-				perror("Expected newline\n");
+				fprintf(stderr,"Expected newline at <%d,%d>\n",ii,jj);
 				exit(1);
 			}
 			grid[ii][jj]=c;
@@ -88,7 +88,7 @@ void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir, int sp){
 			*pcI=(*pcI+1)%ROWS; \
 			break; \
 	}
-void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir, int trace){
+void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir){
 	int pcI=startI; int pcJ=startJ; dir_t dir=start_dir;
 	int sp=-1;
 	char tmp;
@@ -98,9 +98,9 @@ NORMAL:
 	while(1){
 		char opcode=vm->grid[pcI][pcJ];
 
-		if(trace){
-			vm_print_state(vm, pcI, pcJ, dir, sp);
-		}
+#if DEBUG
+		vm_print_state(vm, pcI, pcJ, dir, sp);
+#endif
 
 
 		switch (opcode) {
@@ -231,9 +231,6 @@ NORMAL:
 				break;
 
 			case '@':
-				if(trace){
-					vm_print_grid(vm);
-				}
 				return;
 			default:
 				vm->stack[++sp]=opcode-'0';
@@ -243,9 +240,9 @@ NORMAL:
 
 STRING:
 	/*STRING MODE*/
-	if(trace){
-		fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);
-	}
+#if DEBUG
+	fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);
+#endif
 	pc_incr(&pcI, &pcJ, dir);
 	while(1){
 		char opcode=vm->grid[pcI][pcJ];
@@ -261,9 +258,9 @@ STRING:
 
 ENDSTRING:
 	/*END STRING MODE*/
-	if(trace){
-		fprintf(stderr,"STRING MODE OFF(%d,%d,%d)\n",pcI,pcJ,dir);
-	}
+#if DEBUG
+	fprintf(stderr,"STRING MODE OFF(%d,%d,%d)\n",pcI,pcJ,dir);
+#endif
 	pc_incr(&pcI, &pcJ, dir);
 	goto NORMAL;
 }
@@ -277,7 +274,6 @@ int main(int argc, char const *argv[]) {
 	char grid[ROWS][COLS];
 	preprocess(argv[1], grid);
 	VM* vm = vm_create(grid);
-	// vm_print_grid(vm);
-	vm_exec(vm,0,0,EAST,1);
+	vm_exec(vm,0,0,EAST);
 	printf("\n");
 }
