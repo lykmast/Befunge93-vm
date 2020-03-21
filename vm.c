@@ -214,7 +214,7 @@ void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir, int sp){
 			*pcI=(*pcI+1)%ROWS; \
 			break; \
 	}
-#ifdef DEBUG
+#if DEBUG
 #define NEXT_INSTRUCTION vm_print_state(vm,pcI,pcJ,dir,sp); \
 	goto *(vm->ops[pcI][pcJ]);
 #else
@@ -439,7 +439,7 @@ HLT_OP:
 
 STRING:
 	/*STRING MODE*/
-#ifdef DEBUG
+#if DEBUG
 	fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);
 #endif
 	pc_incr(&pcI, &pcJ, dir);
@@ -457,7 +457,7 @@ STRING:
 
 ENDSTRING:
 	/*END STRING MODE*/
-#ifdef DEBUG
+#if DEBUG
 		fprintf(stderr,"STRING MODE OFF(%d,%d,%d)\n",pcI,pcJ,dir);
 #endif
 	pc_incr(&pcI, &pcJ, dir);
