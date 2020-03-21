@@ -1,7 +1,6 @@
 #define DEFAULT_STACK_SIZE 1000
 #define ROWS 25
 #define COLS 80
-// #define DEBUG 1
 typedef enum {NORTH,EAST,SOUTH,WEST} dir_t;
 typedef struct {
 	void *ops[ROWS][COLS];
