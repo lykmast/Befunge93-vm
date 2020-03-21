@@ -56,7 +56,13 @@ void vm_print_grid(VM *vm){
 				fprintf(stderr,"\n");
 		}
 }
-
+#define vm_print_ops(vm) \
+	for(int ii=0;ii<ROWS;ii++) \
+		for(int jj=0;jj<COLS;jj++){ \
+			fprintf(stderr,"%p ",vm->ops[ii][jj]); \
+			if(jj==COLS-1) \
+				fprintf(stderr,"\n"); \
+		}
 void vm_print_instr(char grid[ROWS][COLS], int pcI, int pcJ){
 	if(grid[pcI][pcJ]!=' ')
 		fprintf(stderr,"%c",grid[pcI][pcJ]);
@@ -68,10 +74,130 @@ void vm_print_stack(char *stack, int count){
 }
 
 void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir, int sp){
+	int top;
+	if(sp==-1) top=vm->stack[sp]; else top=0;
 	if(vm->grid[pcI][pcJ]!=' ')
 		fprintf(stderr, "<pc:(%d,%d,%d), sp:%d, st:%d, op:%c>\n",
-			pcI, pcJ, dir, sp, vm->stack[sp], vm->grid[pcI][pcJ]);
+			pcI, pcJ, dir, sp, top, vm->grid[pcI][pcJ]);
 }
+
+
+#define to_op_label(opcode, op_label) \
+	switch (opcode) { \
+		case ' ': \
+			*op_label=&&SPACE_OP; \
+			break; \
+		case '+': \
+			*op_label=&&PLUS_OP; \
+			break; \
+		case '-': \
+			*op_label=&&MINUS_OP; \
+			break; \
+		case '*': \
+			*op_label=&&MUL_OP; \
+			break; \
+		case '/': \
+			*op_label=&&DIV_OP; \
+			break; \
+		case '%': \
+			*op_label=&&MOD_OP; \
+			break; \
+		case '!': \
+			*op_label=&&NOT_OP; \
+			break; \
+		case '`': \
+			*op_label=&&BGT_OP; \
+			break; \
+		case '>': \
+			*op_label=&&EAST_OP; \
+			break; \
+		case '<': \
+			*op_label=&&WEST_OP; \
+			break; \
+		case '^': \
+			*op_label=&&NORTH_OP; \
+			break; \
+		case 'v': \
+			*op_label=&&SOUTH_OP; \
+			break; \
+		case '?': \
+			*op_label=&&ANY_OP; \
+			break; \
+		case '_': \
+			*op_label=&&HIF_OP; \
+			break; \
+		case '|': \
+			*op_label=&&VIF_OP; \
+			break; \
+		case '"': \
+			*op_label=&&STR_OP; \
+			break; \
+		case ':': \
+			*op_label=&&DUB_OP; \
+			break; \
+		case '\\': \
+			*op_label=&&SWP_OP; \
+			break; \
+		case '$': \
+			*op_label=&&POP_OP; \
+			break; \
+		case '.': \
+			*op_label=&&PRI_OP; \
+			break; \
+		case ',': \
+			*op_label=&&PRC_OP; \
+			break; \
+		case '#': \
+			*op_label=&&SKP_OP; \
+			break; \
+		case 'g': \
+			*op_label=&&GET_OP; \
+			break; \
+		case 'p': \
+			*op_label=&&PUT_OP; \
+			break; \
+		case '&': \
+			*op_label=&&RDI_OP; \
+			break; \
+		case '~': \
+			*op_label=&&RDC_OP; \
+			break; \
+		case '@': \
+			*op_label=&&HLT_OP; \
+			break; \
+		case '0': \
+			*op_label=&&NUM0_OP; \
+			break; \
+		case '1': \
+			*op_label=&&NUM1_OP; \
+			break; \
+		case '2': \
+			*op_label=&&NUM2_OP; \
+			break; \
+		case '3': \
+			*op_label=&&NUM3_OP; \
+			break; \
+		case '4': \
+			*op_label=&&NUM4_OP; \
+			break; \
+		case '5': \
+			*op_label=&&NUM5_OP; \
+			break; \
+		case '6': \
+			*op_label=&&NUM6_OP; \
+			break; \
+		case '7': \
+			*op_label=&&NUM7_OP; \
+			break; \
+		case '8': \
+			*op_label=&&NUM8_OP; \
+			break; \
+		case '9': \
+			*op_label=&&NUM9_OP; \
+			break; \
+		default: \
+			*op_label=&&NOP_OP; \
+	}
 
 #define pc_incr(pcI, pcJ, dir) \
 	switch (dir) { \
@@ -88,222 +214,234 @@ void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir, int sp){
 			*pcI=(*pcI+1)%ROWS; \
 			break; \
 	}
-void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir, int trace){
+#ifdef DEBUG
+#define NEXT_INSTRUCTION vm_print_state(vm,pcI,pcJ,dir,sp); \
+	goto *(vm->ops[pcI][pcJ]);
+#else
+#define NEXT_INSTRUCTION goto *(void *)(vm->ops[pcI][pcJ]);
+#endif
+void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir){
 	int pcI=startI; int pcJ=startJ; dir_t dir=start_dir;
 	int sp=-1;
 	char tmp;
 	char buf[20];
 
-	static void *label_tab[]={
-		&&SPACE_OP,
-		&&PLUS_OP,
-		&&MINUS_OP,
-		&&MUL_OP,
-		&&DIN_OP,
-		&&MOD_OP,
-		&&NOT_OP,
-		&&BGT_OP,
-		&&EAST_OP,
-		&&WEST_OP,
-		&&NORTH_OP,
-		&&SOUTH_OP,
-		&&ANY_OP,
-		&&HIF_OP,
-		&&VIF_OP,
-		&&STR_OP,
-		&&DUB_OP,
-		&&SWP_OP,
-		&&POP_OP,
-		&&PRI_OP,
-		&&PRC_OP,
-		&&SKP_OP,
-		&&GET_OP,
-		&&PUT_OP,
-		&&RDI_OP,
-		&&RDC_OP,
-		&&HLT_OP
-	};
-#define NEXT_INSTRUCTION goto *(void *)label_tab[vm->grid[pcI][pcJ]]
+	/*==========Create vm->ops grid=================*/
+	for(int ii=0;ii<ROWS;ii++)
+		for(int jj=0;jj<COLS;jj++)
+			to_op_label(vm->grid[ii][jj],&(vm->ops[ii][jj]));
+
 NORMAL:
 	/*NORMAL MODE*/
-	while(1){
-		char opcode=vm->grid[pcI][pcJ];
+	NEXT_INSTRUCTION;
 
-		if(trace){
-			vm_print_state(vm, pcI, pcJ, dir, sp);
-		}
-
-
-		switch (opcode) {
-			case ' ':
 SPACE_OP:
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
-			case '+':
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+
 PLUS_OP:
-				vm->stack[sp-1] = vm->stack[sp-1] + vm->stack[sp];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp-1] = vm->stack[sp-1] + vm->stack[sp];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '-':
 MINUS_OP:
-				vm->stack[sp-1] = vm->stack[sp-1] - vm->stack[sp];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp-1] = vm->stack[sp-1] - vm->stack[sp];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '*':
 MUL_OP:
-				vm->stack[sp-1] = vm->stack[sp-1] * vm->stack[sp];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp-1] = vm->stack[sp-1] * vm->stack[sp];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '/':
-DIN_OP:
-				vm->stack[sp-1] = vm->stack[sp-1] / vm->stack[sp];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+DIV_OP:
+	vm->stack[sp-1] = vm->stack[sp-1] / vm->stack[sp];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '%':
 MOD_OP:
-				vm->stack[sp-1] = vm->stack[sp-1] % vm->stack[sp];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp-1] = vm->stack[sp-1] % vm->stack[sp];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '!':
 NOT_OP:
-				vm->stack[sp] = !(vm->stack[sp]);
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp] = !(vm->stack[sp]);
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '`':
 BGT_OP:
-				vm->stack[sp-1] = vm->stack[sp-1] > vm->stack[sp];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp-1] = vm->stack[sp-1] > vm->stack[sp];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '>':
 EAST_OP:
-				dir = EAST;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	dir = EAST;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '<':
 WEST_OP:
-				dir = WEST;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	dir = WEST;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '^':
 NORTH_OP:
-				dir = NORTH;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	dir = NORTH;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case 'v':
 SOUTH_OP:
-				dir = SOUTH;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	dir = SOUTH;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '?':
 ANY_OP:
-				dir = (dir_t)(rand()%4);
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	dir = (dir_t)(rand()%4);
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '_':
 HIF_OP:
-				if(vm->stack[sp])
-					dir = WEST;
-				else
-					dir = EAST;
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	if(vm->stack[sp])
+		dir = WEST;
+	else
+		dir = EAST;
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '|':
 VIF_OP:
-				if(vm->stack[sp])
-					dir = NORTH;
-				else
-					dir = SOUTH;
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	if(vm->stack[sp])
+		dir = NORTH;
+	else
+		dir = SOUTH;
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '"':
 STR_OP:
-				goto STRING;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	goto STRING;
 
-			case ':':
 DUB_OP:
-				vm->stack[sp+1] = vm->stack[sp];
-				sp++;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp+1] = vm->stack[sp];
+	sp++;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '\\':
 SWP_OP:
-				tmp = vm->stack[sp];
-				vm->stack[sp] = vm->stack[sp-1];
-				vm->stack[sp-1] = tmp;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	tmp = vm->stack[sp];
+	vm->stack[sp] = vm->stack[sp-1];
+	vm->stack[sp-1] = tmp;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '$':
 POP_OP:
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '.':
 PRI_OP:
-				printf("%d",vm->stack[sp]);
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	printf("%d",vm->stack[sp]);
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case ',':
 PRC_OP:
-				putchar(vm->stack[sp]);
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	putchar(vm->stack[sp]);
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '#':
 SKP_OP:
-				pc_incr(&pcI, &pcJ, dir);
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	pc_incr(&pcI, &pcJ, dir);
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case 'g':
 GET_OP:
-				vm->stack[sp-1] =
-					vm->grid[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])];
-				sp--;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[sp-1] =
+		vm->grid[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])];
+	sp--;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case 'p':
 PUT_OP:
-				vm->grid[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])] =
-					vm->stack[sp-2];
-				sp-=3;
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->grid[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])] =
+		vm->stack[sp-2];
+	to_op_label(vm->stack[sp-2],
+		&(vm->ops[(int)(vm->stack[sp])][(int)(vm->stack[sp-1])]))
 
-			case '&':
+	sp-=3;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+
 RDI_OP:
-				fgets(buf, 20, stdin);
-				vm->stack[++sp] = atoi(buf);
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	fgets(buf, 20, stdin);
+	vm->stack[++sp] = atoi(buf);
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '~':
 RDC_OP:
-				vm->stack[++sp]=getchar();
-				pc_incr(&pcI,&pcJ,dir);NEXT_INSTRUCTION;break;
+	vm->stack[++sp]=getchar();
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
 
-			case '@':
+NUM0_OP:
+	vm->stack[++sp]=0;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM1_OP:
+	vm->stack[++sp]=1;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM2_OP:
+	vm->stack[++sp]=2;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM3_OP:
+	vm->stack[++sp]=3;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM4_OP:
+	vm->stack[++sp]=4;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM5_OP:
+	vm->stack[++sp]=5;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM6_OP:
+	vm->stack[++sp]=6;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM7_OP:
+	vm->stack[++sp]=7;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM8_OP:
+	vm->stack[++sp]=8;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+NUM9_OP:
+	vm->stack[++sp]=9;
+	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+
+NOP_OP:
+	fprintf(stderr,"NOP ERROR!\n");
+	exit(1);
+
 HLT_OP:
-				if(trace){
-					vm_print_grid(vm);
-				}
-				return;
-			default:
-				vm->stack[++sp]=opcode-'0';
-		}
-		pc_incr(&pcI, &pcJ, dir);
-	}
+	return;
 
 STRING:
 	/*STRING MODE*/
-	if(trace){
-		fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);
-	}
+#ifdef DEBUG
+	fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);
+#endif
 	pc_incr(&pcI, &pcJ, dir);
 	while(1){
 		char opcode=vm->grid[pcI][pcJ];
@@ -319,9 +457,9 @@ STRING:
 
 ENDSTRING:
 	/*END STRING MODE*/
-	if(trace){
+#ifdef DEBUG
 		fprintf(stderr,"STRING MODE OFF(%d,%d,%d)\n",pcI,pcJ,dir);
-	}
+#endif
 	pc_incr(&pcI, &pcJ, dir);
 	goto NORMAL;
 }
@@ -336,7 +474,6 @@ int main(int argc, char const *argv[]) {
 	char grid[ROWS][COLS];
 	preprocess(argv[1], grid);
 	VM* vm = vm_create(grid);
-	// vm_print_grid(vm);
-	vm_exec(vm,0,0,EAST,1);
+	vm_exec(vm,0,0,EAST);
 	printf("\n");
 }
