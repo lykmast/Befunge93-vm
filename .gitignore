@@ -4,4 +4,4 @@
 *.gch
 test.c
 *.log
-!Makefile
+nikitas.c
