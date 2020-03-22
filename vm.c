@@ -53,7 +53,7 @@ void preprocess(char const* filename,char grid[ROWS][COLS]){
 		}
 		else{
 			if(jj==COLS){
-				perror("Expected newline\n");
+				fprintf(stderr,"Parsing error at <%d,%d>: Expected newline\n",ii,jj);
 				exit(1);
 			}
 			grid[ii][jj]=c;
@@ -378,7 +378,7 @@ NUM_OP:
 	NEXT_INSTRUCTION;
 
 NOP_OP:
-	fprintf(stderr,"NOP ERROR!\n");
+	fprintf(stderr,"Invalid command '%c' at <%d,%d>\n",vm->grid[pcI][pcJ],pcI,pcJ);
 	exit(1);
 
 HLT_OP:
@@ -415,12 +415,12 @@ int main(int argc, char const *argv[]) {
 
 	/*--------------PREPROCESSING--------------*/
 	if (argc!=2){
-		perror("Wrong number of arguments\n");
+		fprintf(stderr,"Wrong number of arguments\n");
+		exit(1);
 	}
 	srand(time(NULL));
 	char grid[ROWS][COLS];
 	preprocess(argv[1], grid);
 	VM* vm = vm_create(grid);
 	vm_exec(vm,0,0,EAST);
-	printf("\n");
 }
