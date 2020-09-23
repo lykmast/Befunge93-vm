@@ -3,7 +3,7 @@
 #include "vm.h"
 #include <time.h>
 
-void stack_push(stack_t *stack, long val){
+void stack_push(stack_t *stack, value_t val){
 	if(stack->top>=(DEFAULT_STACK_SIZE-1)){
 		fprintf(stderr,"Stack overflow\n");
 		exit(1);
@@ -11,9 +11,34 @@ void stack_push(stack_t *stack, long val){
 	stack->elements[++(stack->top)]=val;
 }
 
+cell_t* heap_add(heap_t *heap, value_t a, value_t b){
+	cell_t* addr;
+	heap->elements[heap->top].a=a;
+	heap->elements[heap->top].b=b;
+	addr = &(heap->elements[heap->top]);
+	++(heap->top);
+	if(heap->top>=(DEFAULT_HEAP_SIZE-1)){
+		fprintf(stderr,"Heap overflow\n");
+		exit(1);
+		//gc(&addr);
+	}
+	return addr;
+}
+
+void heap_check(heap_t* heap, cell_t* addr){
+	if (addr < heap->elements ||
+	    addr >= heap->elements + DEFAULT_HEAP_SIZE ){
+		fprintf(stderr,"Invalid memory access\n");
+		exit(1);
+	}
+}
+
 VM *vm_create(char grid[ROWS][COLS]){
 	VM* vm= (VM*) malloc(sizeof(VM));
-	vm->stack=(stack_t*)malloc(sizeof(long)*DEFAULT_STACK_SIZE);
+	vm->stack=
+		(stack_t*)malloc(sizeof(stack_t));
+	vm->heap=
+		(heap_t*)malloc(sizeof(heap_t));
 	vm_init(vm, grid);
 	return vm;
 }
@@ -82,14 +107,14 @@ void vm_print_instr(char grid[ROWS][COLS], int pcI, int pcJ){
 }
 
 void stack_print(stack_t *stack, int count){
-	for(long ii=stack->top; ii>=0; ii++)
-		fprintf(stderr,"%ld",stack->elements[ii]);
+	for(index_t ii=stack->top; ii>=0; ii++)
+		fprintf(stderr,V_FMT,stack->elements[ii]);
 }
 
 void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir){
-	long top=stack_peek(vm->stack);
+	value_t top=stack_peek(vm->stack);
 	if(vm->grid[pcI][pcJ]!=' ')
-		fprintf(stderr, "<pc:(%d,%d,%d), sp:%ld, st:%ld, op:%c>\n",
+		fprintf(stderr, "<pc:(%d,%d,%d), sp:" S_FMT ", st:" V_FMT ", op:%c>\n",
 			pcI, pcJ, dir, vm->stack->top, top, vm->grid[pcI][pcJ]);
 }
 
@@ -207,7 +232,8 @@ void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir){
 #endif
 void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir){
 	int pcI=startI; int pcJ=startJ; dir_t dir=start_dir;
-	long val1,val2,val3;
+	value_t val1,val2,val3;
+	cell_t* addr;
 
 	/*==========Create vm->ops grid=================*/
 	for(int ii=0;ii<ROWS;ii++)
@@ -254,13 +280,13 @@ MOD_OP:
 
 NOT_OP:
 	val1=stack_pop(vm->stack);
-	stack_push(vm->stack,!(val1));
+	stack_push(vm->stack,(value_t)!(val1));
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
 BGT_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
-	stack_push(vm->stack,val2>val1);
+	stack_push(vm->stack,(value_t) (val2>val1));
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
@@ -327,7 +353,7 @@ POP_OP:
 	NEXT_INSTRUCTION;
 
 PRI_OP:
-	printf("%ld ",stack_pop(vm->stack));
+	printf(V_FMT " ",stack_pop(vm->stack));
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
@@ -345,7 +371,7 @@ GET_OP:
 	val1=stack_pop(vm->stack);
 	val2=stack_pop(vm->stack);
 	if(val1<ROWS && val2<COLS)
-		stack_push(vm->stack,vm->grid[val1][val2]);
+		stack_push(vm->stack,(value_t) vm->grid[val1][val2]);
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
@@ -362,18 +388,18 @@ PUT_OP:
 	NEXT_INSTRUCTION;
 
 RDI_OP:
-	scanf("%ld",&val1);
+	scanf(V_FMT,&val1);
 	stack_push(vm->stack,val1);
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
 RDC_OP:
-	stack_push(vm->stack, (long)getchar());
+	stack_push(vm->stack, (value_t)getchar());
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
 NUM_OP:
-	stack_push(vm->stack, (vm->grid[pcI][pcJ])-'0');
+	stack_push(vm->stack, (value_t)(vm->grid[pcI][pcJ]-'0'));
 	pc_incr(&pcI,&pcJ,dir);
 	NEXT_INSTRUCTION;
 
@@ -397,7 +423,7 @@ STRING:
 			case '"':
 				goto ENDSTRING;
 			default:
-				stack_push(vm->stack,(long) opcode);
+				stack_push(vm->stack,(value_t) opcode);
 		}
 		pc_incr(&pcI, &pcJ, dir);
 	}
