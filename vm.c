@@ -205,6 +205,15 @@ void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir){
 		case '0' ... '9': \
 			*op_label=&&NUM_OP; \
 			break; \
+		case 'c':\
+			*op_label=&&CONS_OP; \
+			break; \
+		case 'h':\
+			*op_label=&&HEAD_OP; \
+			break; \
+		case 't':\
+			*op_label=&&TAIL_OP; \
+			break; \
 		default: \
 			*op_label=&&NOP_OP; \
 	}
@@ -401,6 +410,25 @@ RDC_OP:
 NUM_OP:
 	stack_push(vm->stack, (value_t)(vm->grid[pcI][pcJ]-'0'));
 	pc_incr(&pcI,&pcJ,dir);
+	NEXT_INSTRUCTION;
+
+CONS_OP:
+	val1=stack_pop(vm->stack);
+	val2=stack_pop(vm->stack);
+	addr=heap_add(vm->heap,val2,val1);
+	stack_push(vm->stack, (value_t)addr);
+	NEXT_INSTRUCTION;
+
+HEAD_OP:
+	addr=(cell_t*)stack_pop(vm->stack);
+	heap_check(vm->heap,addr);
+	stack_push(vm->stack, addr->a);
+	NEXT_INSTRUCTION;
+
+TAIL_OP:
+	addr=(cell_t*)stack_pop(vm->stack);
+	heap_check(vm->heap,addr);
+	stack_push(vm->stack, addr->b);
 	NEXT_INSTRUCTION;
 
 NOP_OP:
