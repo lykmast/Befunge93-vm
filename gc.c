@@ -74,7 +74,7 @@ void sweep_phase(VM* vm){
 			unmark(curr);
 		}
 		else{
-			curr->ptr = heap->freelist;
+			curr->a = (value_t)heap->freelist;
 			heap->freelist = curr;
 #if DEBUG
 			freed++;

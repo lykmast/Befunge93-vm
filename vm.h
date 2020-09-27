@@ -26,7 +26,6 @@ typedef struct{
 
 typedef struct cell_t{
 	value_t a,b;
-	struct cell_t* ptr;
 	uint8_t mark;
 } cell_t;
 

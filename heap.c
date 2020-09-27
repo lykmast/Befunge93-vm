@@ -3,18 +3,20 @@
 void heap_init(heap_t *heap){
 	heap->freelist = heap->elements;
 	for(index_t i=0; i<DEFAULT_HEAP_SIZE-1; i++){
-		heap->elements[i].ptr = &(heap->elements[i+1]);
+		heap->elements[i].a = (value_t)&(heap->elements[i+1]);
 		heap->elements[i].mark = 0;
 	}
 	heap->elements[DEFAULT_HEAP_SIZE-1].mark = 0;
+	heap->elements[DEFAULT_HEAP_SIZE-1].a = (value_t) NULL;
 }
 
 cell_t* heap_add(heap_t *heap, value_t a, value_t b){
-	cell_t* addr;
+	cell_t* addr, *next;
+	addr = heap->freelist;
+	next = (cell_t*)addr->a;
 	heap->freelist->a=a;
 	heap->freelist->b=b;
-	addr = heap->freelist;
-	heap->freelist=heap->freelist->ptr;
+	heap->freelist=next;
 	return addr;
 }
 
