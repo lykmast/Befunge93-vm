@@ -5,3 +5,6 @@
 test.c
 *.log
 nikitas.c
+*.o
+*.cson
+gc_test/*

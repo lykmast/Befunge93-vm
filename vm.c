@@ -1,38 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "vm.h"
 #include <time.h>
-
-void stack_push(stack_t *stack, value_t val){
-	if(stack->top>=(DEFAULT_STACK_SIZE-1)){
-		fprintf(stderr,"Stack overflow\n");
-		exit(1);
-	}
-	stack->elements[++(stack->top)]=val;
-}
-
-cell_t* heap_add(heap_t *heap, value_t a, value_t b){
-	cell_t* addr;
-	heap->elements[heap->top].a=a;
-	heap->elements[heap->top].b=b;
-	addr = &(heap->elements[heap->top]);
-	++(heap->top);
-	if(heap->top>=(DEFAULT_HEAP_SIZE-1)){
-		fprintf(stderr,"Heap overflow\n");
-		exit(1);
-		//gc(&addr);
-	}
-	return addr;
-}
-
-void heap_check(heap_t* heap, cell_t* addr){
-	if (addr < heap->elements ||
-	    addr >= heap->elements + DEFAULT_HEAP_SIZE ){
-		fprintf(stderr,"Invalid memory access\n");
-		exit(1);
-	}
-}
-
+#if DEBUG
+	int instr=0;
+#endif
 VM *vm_create(char grid[ROWS][COLS]){
 	VM* vm= (VM*) malloc(sizeof(VM));
 	vm->stack=
@@ -48,10 +18,19 @@ void vm_free(VM *vm){
 	free(vm);
 }
 
+void vm_check_for_gc(VM* vm){
+	if(!vm->heap->freelist){
+#if DEBUG
+		fprintf(stderr,"Heap full... calling gc.\n");
+#endif		// exit(1);
+		gc(vm);
+	}
+}
 
 void vm_init(VM *vm, char grid[ROWS][COLS]){
 	vm->grid=grid;
 	stack_init(vm->stack);
+	heap_init(vm->heap);
 }
 
 void preprocess(char const* filename,char grid[ROWS][COLS]){
@@ -77,7 +56,7 @@ void preprocess(char const* filename,char grid[ROWS][COLS]){
 			continue;
 		}
 		else{
-			if(jj==COLS){
+			if(jj>=COLS){
 				fprintf(stderr,"Parsing error at <%d,%d>: Expected newline\n",ii,jj);
 				exit(1);
 			}
@@ -106,15 +85,10 @@ void vm_print_instr(char grid[ROWS][COLS], int pcI, int pcJ){
 		fprintf(stderr,"%c",grid[pcI][pcJ]);
 }
 
-void stack_print(stack_t *stack, int count){
-	for(index_t ii=stack->top; ii>=0; ii++)
-		fprintf(stderr,V_FMT,stack->elements[ii]);
-}
-
 void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir){
 	value_t top=stack_peek(vm->stack);
 	if(vm->grid[pcI][pcJ]!=' ')
-		fprintf(stderr, "<pc:(%d,%d,%d), sp:" S_FMT ", st:" V_FMT ", op:%c>\n",
+		fprintf(stderr, "<pc:(%d,%d,%d), sp:" I_FMT ", st:" V_FMT ", op:%c>\n",
 			pcI, pcJ, dir, vm->stack->top, top, vm->grid[pcI][pcJ]);
 }
 
@@ -234,11 +208,13 @@ void vm_print_state(VM *vm, int pcI, int pcJ, dir_t dir){
 			break; \
 	}
 #if DEBUG
-#define NEXT_INSTRUCTION vm_print_state(vm,pcI,pcJ,dir); \
+#define NEXT_INSTRUCTION /*vm_print_state(vm,pcI,pcJ,dir);*/ \
 	goto *(vm->ops[pcI][pcJ]);
 #else
 #define NEXT_INSTRUCTION goto *(void *)(vm->ops[pcI][pcJ]);
 #endif
+
+#define INCR_NEXT pc_incr(&pcI, &pcJ, dir); NEXT_INSTRUCTION;
 void vm_exec(VM *vm, int startI, int startJ, dir_t start_dir){
 	int pcI=startI; int pcJ=startJ; dir_t dir=start_dir;
 	value_t val1,val2,val3;
@@ -254,135 +230,113 @@ NORMAL:
 	NEXT_INSTRUCTION;
 
 SPACE_OP:
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 PLUS_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
 	stack_push(vm->stack,val2+val1);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 MINUS_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
 	stack_push(vm->stack,val2-val1);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 MUL_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
 	stack_push(vm->stack,val2*val1);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 DIV_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
 	stack_push(vm->stack,val2/val1);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 MOD_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
 	stack_push(vm->stack,val2%val1);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 NOT_OP:
 	val1=stack_pop(vm->stack);
 	stack_push(vm->stack,(value_t)!(val1));
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 BGT_OP:
 	val1=stack_pop(vm->stack); val2=stack_pop(vm->stack);
 	stack_push(vm->stack,(value_t) (val2>val1));
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 EAST_OP:
 	dir = EAST;
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 WEST_OP:
 	dir = WEST;
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 NORTH_OP:
 	dir = NORTH;
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 SOUTH_OP:
 	dir = SOUTH;
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 ANY_OP:
 	dir = (dir_t)(rand()%4);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 HIF_OP:
 	if(stack_pop(vm->stack))
 		dir = WEST;
 	else
 		dir = EAST;
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 VIF_OP:
 	if(stack_pop(vm->stack))
 		dir = NORTH;
 	else
 		dir = SOUTH;
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 STR_OP:
 	goto STRING;
 
 DUB_OP:
 	stack_push(vm->stack,stack_peek(vm->stack));
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 SWP_OP:
 	val1 = stack_pop(vm->stack);
 	val2 = stack_pop(vm->stack);
 	stack_push(vm->stack,val1);
 	stack_push(vm->stack,val2);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 POP_OP:
 	stack_pop(vm->stack);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 PRI_OP:
 	printf(V_FMT " ",stack_pop(vm->stack));
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 PRC_OP:
 	printf("%c",(char)(stack_pop(vm->stack)));
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 SKP_OP:
 	pc_incr(&pcI, &pcJ, dir);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 GET_OP:
 	val1=stack_pop(vm->stack);
 	val2=stack_pop(vm->stack);
 	if(val1<ROWS && val2<COLS)
 		stack_push(vm->stack,(value_t) vm->grid[val1][val2]);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 PUT_OP:
 	val1=stack_pop(vm->stack);
@@ -393,43 +347,43 @@ PUT_OP:
 			&(vm->ops[val1][val2]));
 		vm->grid[val1][val2]=val3;
 	}
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 RDI_OP:
-	scanf(V_FMT,&val1);
+	if(scanf(V_FMT,&val1)!=1){
+		fprintf(stderr, "Unsuccesful read.\n");
+		exit(1);
+	}
 	stack_push(vm->stack,val1);
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 RDC_OP:
 	stack_push(vm->stack, (value_t)getchar());
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 NUM_OP:
 	stack_push(vm->stack, (value_t)(vm->grid[pcI][pcJ]-'0'));
-	pc_incr(&pcI,&pcJ,dir);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 CONS_OP:
 	val1=stack_pop(vm->stack);
 	val2=stack_pop(vm->stack);
 	addr=heap_add(vm->heap,val2,val1);
 	stack_push(vm->stack, (value_t)addr);
-	NEXT_INSTRUCTION;
+	vm_check_for_gc(vm);
+	INCR_NEXT;
 
 HEAD_OP:
 	addr=(cell_t*)stack_pop(vm->stack);
 	heap_check(vm->heap,addr);
 	stack_push(vm->stack, addr->a);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 TAIL_OP:
 	addr=(cell_t*)stack_pop(vm->stack);
 	heap_check(vm->heap,addr);
 	stack_push(vm->stack, addr->b);
-	NEXT_INSTRUCTION;
+	INCR_NEXT;
 
 NOP_OP:
 	fprintf(stderr,"Invalid command '%c' at <%d,%d>\n",vm->grid[pcI][pcJ],pcI,pcJ);
@@ -441,7 +395,7 @@ HLT_OP:
 STRING:
 	/*STRING MODE*/
 #if DEBUG
-	fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);
+	/*fprintf(stderr,"STRING MODE ON(%d,%d,%d)\n",pcI,pcJ,dir);*/
 #endif
 	pc_incr(&pcI, &pcJ, dir);
 	while(1){
@@ -459,7 +413,7 @@ STRING:
 ENDSTRING:
 	/*END STRING MODE*/
 #if DEBUG
-	fprintf(stderr,"STRING MODE OFF(%d,%d,%d)\n",pcI,pcJ,dir);
+	/*fprintf(stderr,"STRING MODE OFF(%d,%d,%d)\n",pcI,pcJ,dir);*/
 #endif
 	pc_incr(&pcI, &pcJ, dir);
 	goto NORMAL;
@@ -469,7 +423,7 @@ int main(int argc, char const *argv[]) {
 
 	/*--------------PREPROCESSING--------------*/
 	if (argc!=2){
-		fprintf(stderr,"Wrong number of arguments\n");
+		fprintf(stderr,"Usage: %s <filename>\n",argv[0]);
 		exit(1);
 	}
 	srand(time(NULL));
