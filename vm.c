@@ -375,14 +375,16 @@ CONS_OP:
 
 HEAD_OP:
 	addr=(cell_t*)stack_pop(vm->stack);
+	addr=get_heap_addr(addr);
 	heap_check(vm->heap,addr);
-	stack_push(vm->stack, addr->a);
+	stack_push(vm->stack, get_a_value(addr));
 	INCR_NEXT;
 
 TAIL_OP:
 	addr=(cell_t*)stack_pop(vm->stack);
+	addr=get_heap_addr(addr);
 	heap_check(vm->heap,addr);
-	stack_push(vm->stack, addr->b);
+	stack_push(vm->stack, get_b_value(addr));
 	INCR_NEXT;
 
 NOP_OP:

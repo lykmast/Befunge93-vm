@@ -1,25 +1,44 @@
 CC=gcc
 CFLAGS=-Wall
 
-SOURCES=vm.c stack.c heap.c gc.c mark_field.c
+SOURCES= vm.c \
+         stack.c \
+         heap.c \
+         gc.c \
+         mark.c \
+         mark_reference.c \
+         heap_elements.c \
+         DFSops.c
 
 OBJECTS=$(SOURCES:.c=.o)
 
 
-nodebug: CFLAGS+= -O2 -DDEBUG=0 ## Compile with debug options disabled (default choice)
+nodebug: CFLAGS+= -O2 -DDEBUG=0## Compile with debug options disabled (default choice)
 
 nodebug: out=befunge93+
 
-debug: CFLAGS+= -g -DDEBUG=1 ## Compile with debug options enabled
+debug: CFLAGS+= -Og -g -DDEBUG=1## Compile with debug options enabled
 
 debug: out=vm
 
 nodebug debug: befunge93+
 
-%.o: %.c vm.h
+%.o: %.c %.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-mark_field.o gc.o: gc.h
+mark.h: types.h
+
+heap_elements.h: mark.h
+
+DFSOps.h: types.h mark_reference.h
+
+stack.h: types.h
+
+heap.h: types.h heap_elements.h
+
+vm.h: types.h stack.h heap.h
+
+gc.h: vm.h mark.h
 
 befunge93+: $(OBJECTS)
 	$(CC) -o $(out) $(OBJECTS)
