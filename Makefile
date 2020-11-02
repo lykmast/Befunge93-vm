@@ -1,11 +1,9 @@
 CC=gcc
 
-default: ## Compile with debug options disabled (default choice)
-	CFLAGS= -DDEBUG=0
-debug: ## Compile with debug options enabled
-	CFLAGS= -DDEBUG=1
-
+default: CFLAGS= -DDEBUG=0 ## Compile with debug options disabled (default choice)
 default: befunge93
+
+debug: CFLAGS= -DDEBUG=1 ## Compile with debug options enabled
 debug: befunge93
 
 befunge93: vm.c vm.h
