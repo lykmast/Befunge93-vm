@@ -41,7 +41,7 @@ vm.h: types.h stack.h heap.h
 gc.h: vm.h mark.h
 
 befunge93+: $(OBJECTS)
-	$(CC) -o $(out) $(OBJECTS)
+	$(CC) $(CFLAGS) -o $(out) $(OBJECTS)
 
 clean: ## Delete executables
 	rm -f vm befunge93+ *.o
